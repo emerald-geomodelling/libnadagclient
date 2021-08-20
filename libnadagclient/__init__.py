@@ -60,7 +60,10 @@ def get_project_borehole_data(project_id):
         zipf = zipfile.ZipFile(io.BytesIO(r.content))
         for name in zipf.namelist():
             if name.lower().endswith(".tot") or name.lower().endswith(".cpt"):
-                data = libsgfdata.parse(zipf.open(name))
+                try:
+                    data = libsgfdata.parse(zipf.open(name))
+                except Exception as e:
+                    raise Exception("Unable to parse %s:%s: %s" % (url, name, e))
                 for section in data:
                     if "main" not in section or not len(section["main"][0]) or "investigation_point" not in section["main"][0]:
                         continue
