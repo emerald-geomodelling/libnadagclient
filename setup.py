@@ -15,6 +15,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         "requests-html",
-        "libsgfdata",
+        "libsgfdata >= 0.0.8",
+        "owslib"
     ],
 )
