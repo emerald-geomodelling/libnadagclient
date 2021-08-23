@@ -3,6 +3,10 @@ import urllib.parse
 import zipfile
 import io
 import libsgfdata
+import requests
+import lxml.etree
+from owslib.wfs import WebFeatureService
+from owslib import crs
 
 session = requests_html.HTMLSession()
 
@@ -10,6 +14,24 @@ URL_PROJECT_SEARCH = "https://geo.ngu.no/api/faktaark/nadag/sokGeotekniskUnderso
 URL_PROJECT_PAGE = "https://geo.ngu.no/api/faktaark/nadag/visGeotekniskUndersokelse.php?id=%(project_id)s"
 URL_BOREHOLE_LIST = "https://geo.ngu.no/api/faktaark/nadag/visGeotekniskUndersokelseBorehull.php?id=%(project_id)s"
 URL_BOREHOLE_INFO = "https://geo.ngu.no/api/faktaark/nadag/visGeotekniskBorehull.php?id=%(borehole_id)s"
+
+WMS_SERVER = "http://geo.ngu.no/geoserver/nadag/wfs"
+CRS = 'EPSG:25833'
+FEATURE_TYPE = 'nadag:GB_borefirma'
+
+def getProjectNumbers(bounds):
+    wfs11 = WebFeatureService(url=WMS_SERVER, version='1.1.0')
+    c = crs.Crs(CRS)
+    srsname = c.getcodeurn()
+
+    response = wfs11.getfeature(typename=FEATURE_TYPE, bbox=bounds, srsname=srsname)
+    data = lxml.etree.parse(response)
+    project = data.xpath("//nadag:opprinneliggeotekniskundersid/text()",
+                         namespaces={'nadag': 'https://geo.ngu.no/nadag'})
+    project_number = data.xpath("//nadag:prosjektnr/text()", namespaces={'nadag': 'https://geo.ngu.no/nadag'})
+    for_dict = zip(project, project_number)
+    data = dict(for_dict)
+    return data
 
 def get_project_id(projectnr):
     oriprojectnr = projectnr
