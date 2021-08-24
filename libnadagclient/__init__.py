@@ -7,6 +7,9 @@ import requests
 import lxml.etree
 from owslib.wfs import WebFeatureService
 from owslib import crs
+import logging
+
+logger = logging.getLogger(__name__)
 
 session = requests_html.HTMLSession()
 
@@ -18,6 +21,7 @@ URL_BOREHOLE_INFO = "https://geo.ngu.no/api/faktaark/nadag/visGeotekniskBorehull
 WMS_SERVER = "http://geo.ngu.no/geoserver/nadag/wfs"
 CRS = 'EPSG:25833'
 FEATURE_TYPE = 'nadag:GB_borefirma'
+SGF_EXTENSIONS = ["tot", "cpt", "std"]
 
 def get_project_ids_from_bounds(bounds):
     """Look up project id:s using a geographical bounding box.
@@ -105,11 +109,13 @@ def get_project_borehole_data(project_id):
         r = session.get(url)
         zipf = zipfile.ZipFile(io.BytesIO(r.content))
         for name in zipf.namelist():
-            if name.lower().endswith(".tot") or name.lower().endswith(".cpt"):
+            ext = name.lower().split(".")[-1] if "." in name else ""
+            if ext in SGF_EXTENSIONS:
                 try:
                     data = libsgfdata.parse(zipf.open(name))
                 except Exception as e:
-                    raise Exception("Unable to parse %s:%s: %s" % (url, name, e))
+                    logger.warn("Unable to parse %s:%s: %s" % (url, name, e))
+                    continue
                 for section in data:
                     if "main" not in section or not len(section["main"][0]) or "investigation_point" not in section["main"][0]:
                         continue
