@@ -2,7 +2,7 @@
 
 Client library for the geotechnical database at https://geo.ngu.no/kart/nadag/
 
-This library parses the web pages for soundings, as well as zip-files of SGF (.TOT, .CPT) files uploaded by
+This library parses the web pages for soundings, as well as zip-files of SGF (.TOT, .CPT, .STD) files uploaded by
 users using [libsgfdata](https://github.com/emerald-geomodelling/libsgfdata).
 
 The data is combined and exposed using the [libsgfdata](https://github.com/emerald-geomodelling/libsgfdata) datamodel.
