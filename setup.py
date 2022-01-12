@@ -5,7 +5,7 @@ import os
 
 setuptools.setup(
     name='libnadagclient',
-    version='0.0.2',
+    version='0.0.3',
     description='Client library for the geotechnical database',
     long_description="""Client library for the geotechnical database at https://geo.ngu.no/kart/nadag/""",
     long_description_content_type="text/markdown",
