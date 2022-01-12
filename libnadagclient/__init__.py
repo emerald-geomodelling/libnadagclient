@@ -6,6 +6,7 @@ import libsgfdata
 import requests
 import lxml.etree
 import numpy as np
+import pandas as pd
 from owslib.wfs import WebFeatureService
 from owslib import crs
 
@@ -66,7 +67,10 @@ def _get_info(table):
             return {a.text: list(a.absolute_links)[0]
                     for a in value.find("a")}
         return value.text
-    return {list(set(tr.find("td")[0].attrs["class"]) - set(['header']))[0]: get_value(tr.find(".value")[0])
+    def get_key(clss):
+        clss = [cls for cls in clss if cls != "header"]
+        return " ".join(clss)
+    return {get_key(tr.find("td")[0].attrs["class"]): get_value(tr.find(".value")[0])
             for tr in table.find("tr")}
 
 def get_project_info(project_id):
@@ -105,6 +109,18 @@ def map_nadag_attributes(section):
     section["main"][0]["y_coordinate"] = y
     section["main"][0]["z_coordinate"] = z
 
+    if "p_dyp" in section["nadag"] and "depth_bedrock" not in section["main"][0]:
+        section["main"][0]["depth_bedrock"] = float(section["nadag"]["p_dyp"].split(" ")[0])
+    if "Maks boret lengde (m)" in section["nadag"] and "end_depth" not in section["main"][0]:
+        section["main"][0]["end_depth"] = float(section["nadag"]["Maks boret lengde (m)"])
+
+    if "data" not in section:
+        section["data"] = pd.DataFrame(columns=["depth", "comments"])
+        if "depth_bedrock" in section["main"][0]:
+            section["data"] = section["data"].append({"depth": section["main"][0]["depth_bedrock"], "comments": "rock_level"}, ignore_index=True)
+        if "end_depth" in section["main"][0]:
+            section["data"] = section["data"].append({"depth": section["main"][0]["end_depth"], "comments": "predetermined_depth"}, ignore_index=True)
+        
 def get_project_borehole_data(project_id):
     """Download & parse all borehole data for a project. Data returned
     uses the same datamodel as libsgfdata, except that the toplevel is not
