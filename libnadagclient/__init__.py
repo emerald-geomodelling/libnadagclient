@@ -5,6 +5,8 @@ import io
 import libsgfdata
 import requests
 import lxml.etree
+import numpy as np
+import pandas as pd
 from owslib.wfs import WebFeatureService
 from owslib import crs
 import logging
@@ -21,7 +23,7 @@ URL_BOREHOLE_INFO = "https://geo.ngu.no/api/faktaark/nadag/visGeotekniskBorehull
 WMS_SERVER = "http://geo.ngu.no/geoserver/nadag/wfs"
 CRS = 'EPSG:25833'
 FEATURE_TYPE = 'nadag:GB_borefirma'
-SGF_EXTENSIONS = ["tot", "cpt", "std"]
+SGF_EXTENSIONS = ["tot", "cpt", "std", "dtr"]
 
 def get_project_ids_from_bounds(bounds):
     """Look up project id:s using a geographical bounding box.
@@ -69,7 +71,10 @@ def _get_info(table):
             return {a.text: list(a.absolute_links)[0]
                     for a in value.find("a")}
         return value.text
-    return {list(set(tr.find("td")[0].attrs["class"]) - set(['header']))[0]: get_value(tr.find(".value")[0])
+    def get_key(clss):
+        clss = [cls for cls in clss if cls != "header"]
+        return " ".join(clss)
+    return {get_key(tr.find("td")[0].attrs["class"]): get_value(tr.find(".value")[0])
             for tr in table.find("tr")}
 
 def get_project_info(project_id):
@@ -81,9 +86,10 @@ def get_project_boreholes(project_id):
     def extract_borehole_id(url):
         return urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["id"][0]
     r = session.get(URL_BOREHOLE_LIST % {"project_id": project_id})
-    return {tr.find("td")[0].text: extract_borehole_id(list(tr.absolute_links)[0])
-            for tr in r.html.find("tr")
-            if len(tr.links)}
+    return {key or value: value for key, value
+            in ((tr.find("td")[0].text, extract_borehole_id(list(tr.absolute_links)[0]))
+                for tr in r.html.find("tr")
+                if len(tr.links))}
 
 def get_borehole_info(borehole_id):
     """Get a dictionary of borehole metadata given a borehole_id"""
@@ -91,8 +97,34 @@ def get_borehole_info(borehole_id):
     return _get_info(r.html.find("table")[0])
 
 def _get_project_zip_files(project_info):
-    return {v for k, v in project_info["report"].items() if k.lower().endswith(".zip")}
+    report = project_info["report"]
+    if not isinstance(report, dict):
+        # report == "" means there are no links to files in this field
+        return {}
+    return {v for k, v in report.items() if k.lower().endswith(".zip")}
 
+def map_nadag_attributes(section):
+    # Map some nadag attributes to the corresponding SGF ones
+    x, y = [float(c.split(":")[0]) for c in section["nadag"]["koord"].split(" ")]
+    z = np.nan
+    if " " in section["nadag"]["hoeyde"]:
+        z = float(section["nadag"]["hoeyde"].split(" ")[0])
+    section["main"][0]["x_coordinate"] = x
+    section["main"][0]["y_coordinate"] = y
+    section["main"][0]["z_coordinate"] = z
+
+    if "depth_bedrock" not in section["main"][0] and "p_dyp" in section["nadag"] and section["nadag"]["p_dyp"].strip():
+        section["main"][0]["depth_bedrock"] = float(section["nadag"]["p_dyp"].split(" ")[0])
+    if "end_depth" not in section["main"][0] and "Maks boret lengde (m)" in section["nadag"] and section["nadag"]["Maks boret lengde (m)"].strip():
+        section["main"][0]["end_depth"] = float(section["nadag"]["Maks boret lengde (m)"])
+
+    if "data" not in section:
+        section["data"] = pd.DataFrame(columns=["depth", "comments"])
+        if "depth_bedrock" in section["main"][0]:
+            section["data"] = section["data"].append({"depth": section["main"][0]["depth_bedrock"], "comments": "rock_level"}, ignore_index=True)
+        if "end_depth" in section["main"][0]:
+            section["data"] = section["data"].append({"depth": section["main"][0]["end_depth"], "comments": "predetermined_depth"}, ignore_index=True)
+        
 def get_project_borehole_data(project_id):
     """Download & parse all borehole data for a project. Data returned
     uses the same datamodel as libsgfdata, except that the toplevel is not
@@ -125,12 +157,16 @@ def get_project_borehole_data(project_id):
                     borehole_id = borehole_map[investigation_point]
                     section["nadag"] = get_borehole_info(borehole_id)
 
-                    # Map some nadag attributes to the corresponding SGF ones
-                    x, y = [float(c.split(":")[0]) for c in section["nadag"]["koord"].split(" ")]
-                    z = float(section["nadag"]["hoeyde"].split(" ")[0])
-                    section["main"][0]["x_coordinate"] = x
-                    section["main"][0]["y_coordinate"] = y
-                    section["main"][0]["z_coordinate"] = z
-                    
+                    map_nadag_attributes(section)
+                                        
                     res[borehole_id] = section
+                    
+    # Handle boreholes lacking zip-files...
+    for investigation_point, borehole_id in borehole_map.items():
+        if borehole_id not in res:
+            section = {"main": [{}]}
+            section["nadag"] = get_borehole_info(borehole_id)
+            map_nadag_attributes(section)
+            res[borehole_id] = section
+    
     return res
