@@ -87,7 +87,11 @@ def get_borehole_info(borehole_id):
     return _get_info(r.html.find("table")[0])
 
 def _get_project_zip_files(project_info):
-    return {v for k, v in project_info["report"].items() if k.lower().endswith(".zip")}
+    report = project_info["report"]
+    if not isinstance(report, dict):
+        # report == "" means there are no links to files in this field
+        return {}
+    return {v for k, v in report.items() if k.lower().endswith(".zip")}
 
 def get_project_borehole_data(project_id):
     """Download & parse all borehole data for a project. Data returned
