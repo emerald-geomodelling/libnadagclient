@@ -109,9 +109,9 @@ def map_nadag_attributes(section):
     section["main"][0]["y_coordinate"] = y
     section["main"][0]["z_coordinate"] = z
 
-    if "p_dyp" in section["nadag"] and "depth_bedrock" not in section["main"][0]:
+    if "depth_bedrock" not in section["main"][0] and "p_dyp" in section["nadag"] and section["nadag"]["p_dyp"].strip():
         section["main"][0]["depth_bedrock"] = float(section["nadag"]["p_dyp"].split(" ")[0])
-    if "Maks boret lengde (m)" in section["nadag"] and "end_depth" not in section["main"][0]:
+    if "end_depth" not in section["main"][0] and "Maks boret lengde (m)" in section["nadag"] and section["nadag"]["Maks boret lengde (m)"].strip():
         section["main"][0]["end_depth"] = float(section["nadag"]["Maks boret lengde (m)"])
 
     if "data" not in section:
@@ -137,7 +137,8 @@ def get_project_borehole_data(project_id):
         r = session.get(url)
         zipf = zipfile.ZipFile(io.BytesIO(r.content))
         for name in zipf.namelist():
-            if name.lower().endswith(".tot") or name.lower().endswith(".cpt"):
+            ext = name.lower().rsplit(".", 1)[-1]
+            if ext in ("tot", "cpt", "std", "dtr"):
                 try:
                     data = libsgfdata.parse(zipf.open(name))
                 except Exception as e:
@@ -154,7 +155,7 @@ def get_project_borehole_data(project_id):
                     map_nadag_attributes(section)
                                         
                     res[borehole_id] = section
-
+                    
     # Handle boreholes lacking zip-files...
     for investigation_point, borehole_id in borehole_map.items():
         if borehole_id not in res:
