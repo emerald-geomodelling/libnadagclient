@@ -5,6 +5,7 @@ import io
 import libsgfdata
 import requests
 import lxml.etree
+import numpy as np
 from owslib.wfs import WebFeatureService
 from owslib import crs
 
@@ -77,9 +78,10 @@ def get_project_boreholes(project_id):
     def extract_borehole_id(url):
         return urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["id"][0]
     r = session.get(URL_BOREHOLE_LIST % {"project_id": project_id})
-    return {tr.find("td")[0].text: extract_borehole_id(list(tr.absolute_links)[0])
-            for tr in r.html.find("tr")
-            if len(tr.links)}
+    return {key or value: value for key, value
+            in ((tr.find("td")[0].text, extract_borehole_id(list(tr.absolute_links)[0]))
+                for tr in r.html.find("tr")
+                if len(tr.links))}
 
 def get_borehole_info(borehole_id):
     """Get a dictionary of borehole metadata given a borehole_id"""
@@ -92,6 +94,16 @@ def _get_project_zip_files(project_info):
         # report == "" means there are no links to files in this field
         return {}
     return {v for k, v in report.items() if k.lower().endswith(".zip")}
+
+def map_nadag_attributes(section):
+    # Map some nadag attributes to the corresponding SGF ones
+    x, y = [float(c.split(":")[0]) for c in section["nadag"]["koord"].split(" ")]
+    z = np.nan
+    if " " in section["nadag"]["hoeyde"]:
+        z = float(section["nadag"]["hoeyde"].split(" ")[0])
+    section["main"][0]["x_coordinate"] = x
+    section["main"][0]["y_coordinate"] = y
+    section["main"][0]["z_coordinate"] = z
 
 def get_project_borehole_data(project_id):
     """Download & parse all borehole data for a project. Data returned
@@ -123,12 +135,16 @@ def get_project_borehole_data(project_id):
                     borehole_id = borehole_map[investigation_point]
                     section["nadag"] = get_borehole_info(borehole_id)
 
-                    # Map some nadag attributes to the corresponding SGF ones
-                    x, y = [float(c.split(":")[0]) for c in section["nadag"]["koord"].split(" ")]
-                    z = float(section["nadag"]["hoeyde"].split(" ")[0])
-                    section["main"][0]["x_coordinate"] = x
-                    section["main"][0]["y_coordinate"] = y
-                    section["main"][0]["z_coordinate"] = z
-                    
+                    map_nadag_attributes(section)
+                                        
                     res[borehole_id] = section
+
+    # Handle boreholes lacking zip-files...
+    for investigation_point, borehole_id in borehole_map.items():
+        if borehole_id not in res:
+            section = {"main": [{}]}
+            section["nadag"] = get_borehole_info(borehole_id)
+            map_nadag_attributes(section)
+            res[borehole_id] = section
+    
     return res
