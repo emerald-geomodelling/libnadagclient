@@ -7,7 +7,7 @@ users using [libsgfdata](https://github.com/emerald-geomodelling/libsgfdata).
 
 The data is combined and exposed using the [libsgfdata](https://github.com/emerald-geomodelling/libsgfdata) datamodel.
 
-# Usage
+# Library usage
 
     >>> import libnadagclient 
 
@@ -29,3 +29,8 @@ them all in a single SGF file:
 
     >>> d = libnadagclient.get_project_borehole_data("306dc437-08f8-40f2-a918-7f65c423611b")
     >>> libsgfdata.dump(list(d.values()), "306dc437-08f8-40f2-a918-7f65c423611b.tot")
+
+# Command line usage
+
+    myuser@mymachine:~$ sgfdata --informat nadag_project 5cdc31e7-f332-4f57-94de-9e5695621e17 test1.sgf
+    myuser@mymachine:~$ sgfdata --informat nadag_bbox 313156.8520104526,6671055.691595874,339199.23407153715,6686819.705570765 test2.sgf
