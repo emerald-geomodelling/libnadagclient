@@ -18,7 +18,7 @@ URL_PROJECT_PAGE = "https://geo.ngu.no/api/faktaark/nadag/visGeotekniskUndersoke
 URL_BOREHOLE_LIST = "https://geo.ngu.no/api/faktaark/nadag/visGeotekniskUndersokelseBorehull.php?id=%(project_id)s"
 URL_BOREHOLE_INFO = "https://geo.ngu.no/api/faktaark/nadag/visGeotekniskBorehull.php?id=%(borehole_id)s"
 
-WMS_SERVER = "http://geo.ngu.no/geoserver/nadag/wfs"
+WFS_SERVER = "https://geo.ngu.no/geoserver/nadag/wfs"
 CRS = 'EPSG:25833'
 FEATURE_TYPE = 'nadag:GB_borefirma'
 SGF_EXTENSIONS = ["tot", "cpt", "std"]
@@ -30,11 +30,13 @@ def get_project_ids_from_bounds(bounds):
 
     Returns a dictionary of {project_id: projectnr}
     """
-    wfs11 = WebFeatureService(url=WMS_SERVER, version='1.1.0')
-    c = crs.Crs(CRS)
-    srsname = c.getcodeurn()
+    wfs11 = WebFeatureService(url=WFS_SERVER, version='2.0.0')
 
-    response = wfs11.getfeature(typename=FEATURE_TYPE, bbox=bounds, srsname=srsname)
+    # Removed from use for version 1.0.0 WFS server
+    #c = crs.Crs(CRS)
+    #srsname = c.getcodeurn()
+
+    response = wfs11.getfeature(typename=FEATURE_TYPE, bbox=bounds)
     data = lxml.etree.parse(response)
 
     def get_name(project):
