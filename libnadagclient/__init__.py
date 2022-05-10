@@ -172,3 +172,33 @@ def get_project_borehole_data(project_id):
             res[borehole_id] = section
     
     return res
+
+def get_project_metadata(project_ids_dict):
+    """ Takes a dict returned from 'get_project_ids_from_bounds'
+    and returns a dataframe of metadata for all available nadag projects
+    """
+    meta_dict = {}
+    for key in project_ids_dict.keys():
+        meta_dict[key] = get_project_info(key)
+
+    df = pd.DataFrame(meta_dict, ).transpose().rename_axis('project_id')
+    df.loc[:, 'antallborehull_int'] = df.antallborehull.apply(lambda x: int(list(x.keys())[0]))
+    df.loc[:, 'infoark_url'] = df.antallborehull.apply(lambda x: list(x.values())[0])
+    df.loc[:, 'nedlasting_url'] = df.nedlastbare.apply(lambda x: list(x.values())[0] if type(x) == dict else '')
+    df.loc[:, 'stack_url'] = df.report.apply(get_stack_zip_url)
+    df.loc[:, 'nadag_project_id'] = df.nedlasting_url.apply(get_nadag_id_from_url)
+    return df
+
+def get_stack_zip_url(obj):
+    if type(obj) == dict:
+        if 'stack.zip' in obj.keys():
+            return obj['stack.zip']
+    return ''
+
+def get_nadag_id_from_url(obj):
+    try:
+        result = urllib.parse.urlparse(obj)
+        id_project = int(urllib.parse.unquote(result.query).rsplit('=')[-1])
+        return id_project
+    except Exception:
+        return -999
