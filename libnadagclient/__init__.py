@@ -122,10 +122,19 @@ def map_nadag_attributes(section):
 
     if "data" not in section:
         section["data"] = pd.DataFrame(columns=["depth", "comments"])
+        # DataFrame.append was removed in pandas 2.0; concat of a one-row frame is the
+        # replacement. ignore_index=True was already set, so the 0..n-1 index is unchanged
+        # whether one or both of these rows is added.
         if "depth_bedrock" in section["main"][0]:
-            section["data"] = section["data"].append({"depth": section["main"][0]["depth_bedrock"], "comments": "rock_level"}, ignore_index=True)
+            section["data"] = pd.concat(
+                [section["data"],
+                 pd.DataFrame([{"depth": section["main"][0]["depth_bedrock"], "comments": "rock_level"}])],
+                ignore_index=True)
         if "end_depth" in section["main"][0]:
-            section["data"] = section["data"].append({"depth": section["main"][0]["end_depth"], "comments": "predetermined_depth"}, ignore_index=True)
+            section["data"] = pd.concat(
+                [section["data"],
+                 pd.DataFrame([{"depth": section["main"][0]["end_depth"], "comments": "predetermined_depth"}])],
+                ignore_index=True)
         
 def get_project_borehole_data(project_id):
     """Download & parse all borehole data for a project. Data returned
